@@ -691,6 +691,81 @@ def create_delegate_assignment():
         print("Error en la asignación:", str(e))  # Debug
         return jsonify({'error': str(e)}), 500
 
+@app.route('/benefit-deliveries', methods=['GET', 'POST'])
+def benefit_delivery_operations():
+    if request.method == 'GET':
+        try:
+            deliveries = BenefitDelivery.query.all()
+            return jsonify([delivery.to_dict() for delivery in deliveries])
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    if request.method == 'POST':
+        try:
+            data = request.json
+            print("Datos recibidos de la entrega:", data)  # Debug
+
+            # Validar datos requeridos
+            required_fields = ['delegate_id', 'benefit_id', 'quantity', 'recipient_type']
+            for field in required_fields:
+                if field not in data:
+                    return jsonify({'error': f'El campo {field} es requerido'}), 400
+
+            # Verificar que el beneficio existe y tiene stock suficiente
+            benefit = Benefit.query.get(data['benefit_id'])
+            if not benefit:
+                return jsonify({'error': 'Beneficio no encontrado'}), 404
+
+            if benefit.stock_rest < data['quantity']:
+                return jsonify({'error': 'Stock insuficiente'}), 400
+
+            # Crear nueva entrega
+            new_delivery = BenefitDelivery(
+                delegate_id=data['delegate_id'],
+                affiliate_id=data.get('affiliate_id'),
+                benefit_id=data['benefit_id'],
+                child_id=data.get('child_id'),
+                quantity=data['quantity'],
+                notes=data.get('notes', ''),
+                recipient_type=data['recipient_type']
+            )
+
+            # Actualizar el stock restante del beneficio
+            benefit.stock_rest -= data['quantity']
+
+            db.session.add(new_delivery)
+            db.session.commit()
+
+            return jsonify(new_delivery.to_dict()), 201
+
+        except Exception as e:
+            db.session.rollback()
+            print("Error al crear entrega:", str(e))  # Debug
+            return jsonify({'error': str(e)}), 500
+
+@app.route('/benefit-deliveries/<int:delivery_id>', methods=['GET', 'DELETE'])
+def benefit_delivery_detail(delivery_id):
+    try:
+        delivery = BenefitDelivery.query.get_or_404(delivery_id)
+        
+        if request.method == 'GET':
+            return jsonify(delivery.to_dict())
+            
+        if request.method == 'DELETE':
+            # Restaurar el stock del beneficio
+            benefit = Benefit.query.get(delivery.benefit_id)
+            if benefit:
+                benefit.stock_rest += delivery.quantity
+            
+            db.session.delete(delivery)
+            db.session.commit()
+            
+            return jsonify({'message': 'Entrega eliminada correctamente'})
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 # Iniciar la aplicación
 if __name__ == '__main__':
     with app.app_context():
