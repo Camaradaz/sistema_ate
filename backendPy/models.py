@@ -190,52 +190,28 @@ class DelegateAssignment(db.Model):
 
 class BenefitDelivery(db.Model):
     __tablename__ = 'benefit_deliveries'
-    
-    benefit_id = db.Column(db.Integer, db.ForeignKey('benefits.id'), primary_key=True)
-    affiliate_id = db.Column(db.Integer, db.ForeignKey('affiliates.id_associate'), nullable=False)
-    child_id = db.Column(db.Integer, db.ForeignKey('children.child_id'), nullable=True)
-    delegate_id = db.Column(db.Integer, db.ForeignKey('delegates.id'), nullable=False)
-    delivery_date = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
-    recipient_type = db.Column(db.String(20), nullable=False)  # 'affiliate' o 'child'
-    
-    # Relaciones
-    benefit = db.relationship('Benefit', backref='deliveries')
-    affiliate = db.relationship('Affiliate', backref='benefit_deliveries')
-    child = db.relationship('Child', backref='benefit_deliveries')
-    delegate = db.relationship('Delegate', backref='benefit_deliveries')
+
+    delivery_id = db.Column(db.Integer, primary_key=True)
+    delegate_id = db.Column(db.Integer, db.ForeignKey('delegates.id'))
+    affiliate_id = db.Column(db.Integer, db.ForeignKey('affiliates.id_associate'))
+    benefit_id = db.Column(db.Integer, db.ForeignKey('benefits.id'))
+    child_id = db.Column(db.Integer, db.ForeignKey('children.child_id'))
+    quantity = db.Column(db.Integer, default=1, nullable=False)
+    delivery_date = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(50), default='Entregado')
+    recipient_type = db.Column(db.String(50))
 
     def to_dict(self):
         return {
-            'benefit_id': self.benefit_id,
-            'affiliate_id': self.affiliate_id,
-            'child_id': self.child_id,
+            'delivery_id': self.delivery_id,
             'delegate_id': self.delegate_id,
+            'affiliate_id': self.affiliate_id,
+            'benefit_id': self.benefit_id,
+            'child_id': self.child_id,
+            'quantity': self.quantity,
             'delivery_date': self.delivery_date.isoformat() if self.delivery_date else None,
-            'recipient_type': self.recipient_type,
-            'benefit_name': self.benefit.name if self.benefit else None,
-            'affiliate_name': f"{self.affiliate.affiliate_name}" if self.affiliate else None,
-            'child_name': f"{self.child.first_name} {self.child.last_name}" if self.child else None,
-            'delegate_name': f"{self.delegate.first_name} {self.delegate.last_name}" if self.delegate else None
+            'notes': self.notes,
+            'status': self.status,
+            'recipient_type': self.recipient_type
         }
-
-class Kit(db.Model):
-    __tablename__ = 'kits'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
-
-    # Agregamos la columna delivery_id
-    delivery_id = db.Column(db.Integer, db.ForeignKey('benefit_deliveries.delivery_id'))
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'description': self.description,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
-
